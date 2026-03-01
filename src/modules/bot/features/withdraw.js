@@ -242,12 +242,12 @@ export function createWithdrawFeature(deps) {
         const txLink = formatTxHashLink ? formatTxHashLink(txHash) : txHash;
         await ctx.editMessageText(
           t('withdraw_success', { txHash: txLink }),
-          { reply_markup: await getMainMenuKeyboard(config.language || 'ru') }
+          { reply_markup: await getMainMenuKeyboard(config.language || 'ru'), parse_mode: 'HTML' }
         );
       } else {
         await ctx.editMessageText(
           t('withdraw_success', { txHash: 'unknown' }),
-          { reply_markup: await getMainMenuKeyboard(config.language || 'ru') }
+          { reply_markup: await getMainMenuKeyboard(config.language || 'ru'), parse_mode: 'HTML' }
         );
       }
     } catch (error) {
