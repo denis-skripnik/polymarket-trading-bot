@@ -473,7 +473,8 @@ const {
   getTxHashFromResult,
   updateStrategy,
   encodeStrategyOrderPair,
-  updateOrderStatus
+  updateOrderStatus,
+  formatTxHashLink
 });
 
 const {
@@ -574,7 +575,8 @@ const {
   getCollateralBalanceBase,
   getTokenSharesBalanceBase,
   buildUsdcPercentKeyboard,
-  startLimitFlow
+  startLimitFlow,
+  formatTxHashLink
 });
 
 const {

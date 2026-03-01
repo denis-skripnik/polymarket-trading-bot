@@ -115,7 +115,8 @@ export function createTradeMarketFeature(deps) {
     getCollateralBalanceBase,
     getTokenSharesBalanceBase,
     buildUsdcPercentKeyboard,
-    startLimitFlow
+    startLimitFlow,
+    formatTxHashLink
   } = deps;
 
   async function showOutcomeSelection(ctx, actionKey, language, t) {
@@ -410,9 +411,16 @@ export function createTradeMarketFeature(deps) {
 
       if (result.success) {
         const orderId = extractOrderId(result) || t('unknown');
+        // Try to get transaction hash for link
+        let orderIdDisplay = orderId;
+        if (formatTxHashLink && result.transactionsHashes && result.transactionsHashes.length > 0) {
+          orderIdDisplay = formatTxHashLink(result.transactionsHashes[0]);
+        } else if (formatTxHashLink && result.transactionHash) {
+          orderIdDisplay = formatTxHashLink(result.transactionHash);
+        }
         await ctx.editMessageText(
-          t('order_executed', { orderId }),
-          { reply_markup: await getMainMenuKeyboard(config.language || 'ru') }
+          t('order_executed', { orderId: orderIdDisplay }),
+          { reply_markup: await getMainMenuKeyboard(config.language || 'ru'), parse_mode: 'HTML' }
         );
       } else {
         await ctx.editMessageText(
@@ -796,10 +804,17 @@ export function createTradeMarketFeature(deps) {
         });
 
         const orderId = extractOrderId(result) || t('unknown');
+        // Try to get transaction hash for link
+        let orderIdDisplay = orderId;
+        if (formatTxHashLink && result.transactionsHashes && result.transactionsHashes.length > 0) {
+          orderIdDisplay = formatTxHashLink(result.transactionsHashes[0]);
+        } else if (formatTxHashLink && result.transactionHash) {
+          orderIdDisplay = formatTxHashLink(result.transactionHash);
+        }
 
         await ctx.editMessageText(
-          t('order_executed', { orderId }),
-          { reply_markup: await getMainMenuKeyboard(config.language || 'ru') }
+          t('order_executed', { orderId: orderIdDisplay }),
+          { reply_markup: await getMainMenuKeyboard(config.language || 'ru'), parse_mode: 'HTML' }
         );
       } else {
         await ctx.editMessageText(

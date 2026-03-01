@@ -38,7 +38,8 @@ export function createStrategiesFeature(deps) {
     getTxHashFromResult,
     updateStrategy,
     encodeStrategyOrderPair,
-    updateOrderStatus
+    updateOrderStatus,
+    formatTxHashLink
   } = deps;
 
   async function showStrategies(ctx) {
@@ -380,13 +381,17 @@ export function createStrategiesFeature(deps) {
       });
 
       if (fullyClosed) {
-        const mergeLabel = mergeTxHash ? `\nMerge tx: ${mergeTxHash}` : '';
+        let mergeLabel = '';
+        if (mergeTxHash) {
+          const txLink = formatTxHashLink ? formatTxHashLink(mergeTxHash) : mergeTxHash;
+          mergeLabel = `\nMerge tx: ${txLink}`;
+        }
         await ctx.editMessageText(
           t('strategy_close_done', {
             id: state.strategyId,
             details: mergeLabel
           }),
-          { reply_markup: await getMainMenuKeyboard(config.language || 'ru') }
+          { reply_markup: await getMainMenuKeyboard(config.language || 'ru'), parse_mode: 'HTML' }
         );
       } else {
         await ctx.editMessageText(
