@@ -19,7 +19,9 @@ export function createHandleTextMessageRouter(deps) {
     handleLimitPrice,
     handleStrategySettingsInput,
     handleNotificationSettingsInput,
-    handleEventsFilterRangeInput
+    handleEventsFilterRangeInput,
+    handleWithdrawAddress,
+    handleWithdrawAmount
   } = deps;
 
   return async function handleTextMessage(ctx) {
@@ -92,6 +94,12 @@ export function createHandleTextMessageRouter(deps) {
           break;
         case 'AWAITING_EVENTS_FILTER_RANGE':
           await handleEventsFilterRangeInput(ctx, state, text);
+          break;
+        case 'AWAITING_WITHDRAW_ADDRESS':
+          await handleWithdrawAddress(ctx, text);
+          break;
+        case 'AWAITING_WITHDRAW_AMOUNT':
+          await handleWithdrawAmount(ctx, text);
           break;
         default:
           await ctx.reply(t('main_menu'), {

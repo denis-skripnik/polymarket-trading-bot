@@ -139,6 +139,7 @@ import { createOrdersFeature } from './features/orders.js';
 import { createStrategiesFeature } from './features/strategies.js';
 import { createSecurityFeature } from './features/security.js';
 import { createSettingsFeature } from './features/settings.js';
+import { createWithdrawFeature } from './features/withdraw.js';
 import { createTradeMarketFeature } from './features/trade-market.js';
 import { createTradeLimitFeature } from './features/trade-limit.js';
 import { createTradeOnchainFeature } from './features/trade-onchain.js';
@@ -321,7 +322,12 @@ const handleCallback = createHandleCallbackRouter({
   handleConfirmExportPk,
   handleCancelExportPk,
   showLanguageSettings,
-  handleSettingsLanguageChange
+  handleSettingsLanguageChange,
+  startWithdrawFlow,
+  executeWithdraw,
+  handleWithdrawAddress,
+  handleWithdrawAmount,
+  handleWithdrawPercent
 });
 
 // Show language settings in Settings menu
@@ -518,6 +524,18 @@ const {
 });
 
 const {
+  startWithdrawFlow: startWithdrawFlowFeature,
+  handleWithdrawAddress: handleWithdrawAddressFeature,
+  handleWithdrawAmount: handleWithdrawAmountFeature,
+  handleWithdrawPercent: handleWithdrawPercentFeature,
+  executeWithdraw: executeWithdrawFeature
+} = createWithdrawFeature({
+  getMainMenuKeyboard,
+  ensureClientInitialized,
+  ensureContractsInitialized
+});
+
+const {
   showOutcomeSelection: showOutcomeSelectionFeature,
   handleOutcomeSelection: handleOutcomeSelectionFeature,
   startBuyFlow: startBuyFlowFeature,
@@ -644,7 +662,9 @@ const handleTextMessage = createHandleTextMessageRouter({
   handleLimitPrice,
   handleStrategySettingsInput,
   handleNotificationSettingsInput,
-  handleEventsFilterRangeInput
+  handleEventsFilterRangeInput,
+  handleWithdrawAddress,
+  handleWithdrawAmount
 });
 
 // Show markets list - does NOT require initialized clobClient
@@ -2687,6 +2707,16 @@ async function handleEventsFilterRangeInput(ctx, state, text) {
   await handleEventsFilterRangeInputFeature(ctx, state, text);
 }
 
+// Handle withdraw address input
+async function handleWithdrawAddress(ctx, text) {
+  await handleWithdrawAddressFeature(ctx, text);
+}
+
+// Handle withdraw amount input
+async function handleWithdrawAmount(ctx, text) {
+  await handleWithdrawAmountFeature(ctx, text);
+}
+
 // Handle wallet initialization
 // Handle wallet initialization
 async function handleInitWallet(ctx) {
@@ -2721,6 +2751,21 @@ async function handleConfirmExportPk(ctx) {
 // Handle cancel export private key
 async function handleCancelExportPk(ctx) {
   await handleCancelExportPkFeature(ctx);
+}
+
+// Handle withdraw flow entry point
+async function startWithdrawFlow(ctx) {
+  await startWithdrawFlowFeature(ctx);
+}
+
+// Handle withdraw percent button
+async function handleWithdrawPercent(ctx, percent) {
+  await handleWithdrawPercentFeature(ctx, percent);
+}
+
+// Execute confirmed withdraw
+async function executeWithdraw(ctx) {
+  await executeWithdrawFeature(ctx);
 }
 
 // Handle confirmation input for export
