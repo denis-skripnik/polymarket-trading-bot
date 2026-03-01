@@ -1158,14 +1158,15 @@ async function executeConfirmedRedeem(ctx) {
 
     await refreshPositionsAfterMutation(chatId, config.walletAddress);
 
-    const txLabel = txHash || t('unknown');
+    const txLabel = txHash ? formatTxHashLink(txHash) : escapeHtml(t('unknown'));
     const redeemLabel = getRedeemActionLabel(language);
     await ctx.editMessageText(
       `${redeemLabel}\n${t('transaction_confirmed', { hash: txLabel })}`,
       {
         reply_markup: new InlineKeyboard()
           .text(t('menu_positions'), 'positions')
-          .text(t('back'), 'back_menu')
+          .text(t('back'), 'back_menu'),
+        parse_mode: 'HTML'
       }
     );
   } catch (error) {
