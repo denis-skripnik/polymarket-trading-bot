@@ -9,6 +9,7 @@ Single-user Telegram bot for trading on Polymarket (Polygon), with market/limit 
 - Quick open by Polymarket URL (`/event/<event-slug>` or `/event/<event-slug>/<market-slug>`)
 - Market orders (FOK) and limit orders (GTC)
 - Split/merge via Conditional Tokens Framework contracts
+- Withdraw USDC to external wallet
 - Strategy flow from market screen: split USDC into YES/NO, place two take-profit SELL limit orders, and track strategy state in SQLite
 - Positions, orders, and strategies views in Telegram
 - Background workers for position sync, order reconciliation, price alerts, and strategy monitoring
@@ -260,7 +261,7 @@ Other menus:
 - `Positions`: view current positions, open sell/merge/redeem actions from a position
 - `Orders`: view and cancel cancellable orders
 - `My Strategies`: inspect strategy legs and close a strategy manually
-- `Settings`: language, strategy params, notification params, allowances, collateral status, private key export
+- `Settings`: language, strategy params, notification params, allowances, collateral status, withdraw funds, private key export
 
 Open by URL:
 
