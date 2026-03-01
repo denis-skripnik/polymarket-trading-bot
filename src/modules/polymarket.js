@@ -3041,9 +3041,12 @@ export async function withdrawUSDC(toAddress, amountBase) {
     throw new Error(`Insufficient balance. Available: ${formatUSDCFromBase(balance)} USDC`);
   }
   
-  // Execute transfer
-  const tx = await tokenContract.transfer(normalizedAddress, amountBase);
-  return await tx.wait();
+  // Execute transfer with adaptive gas
+  return await sendWithAdaptiveApprovalGas(
+    'withdrawUSDC',
+    async (overrides) => tokenContract.transfer(normalizedAddress, amountBase, overrides),
+    { toAddress: normalizedAddress, amountBase: amountBase.toString() }
+  );
 }
 
 // Check ERC1155 approval (for conditional tokens)
