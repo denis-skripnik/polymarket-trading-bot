@@ -1,11 +1,8 @@
-const nodeInterpreter = process.env.PM2_NODE_INTERPRETER || 'node';
-
 module.exports = {
   apps: [
     {
       name: 'polymarket-trading-bot',
       script: 'src/index.js',
-      interpreter: nodeInterpreter,
       cwd: __dirname,
       exec_mode: 'fork',
       instances: 1,
