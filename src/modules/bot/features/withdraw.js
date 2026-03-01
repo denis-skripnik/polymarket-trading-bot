@@ -30,7 +30,8 @@ export function createWithdrawFeature(deps) {
   const {
     getMainMenuKeyboard,
     ensureClientInitialized,
-    ensureContractsInitialized
+    ensureContractsInitialized,
+    formatTxHashLink
   } = deps;
 
   async function startWithdrawFlow(ctx) {
@@ -236,9 +237,11 @@ export function createWithdrawFeature(deps) {
 
       const receipt = await withdrawUSDC(address, amountBase);
 
-      if (receipt && receipt.hash) {
+      if (receipt && (receipt.hash || receipt.transactionHash)) {
+        const txHash = receipt.hash || receipt.transactionHash;
+        const txLink = formatTxHashLink ? formatTxHashLink(txHash) : txHash;
         await ctx.editMessageText(
-          t('withdraw_success', { txHash: receipt.hash }),
+          t('withdraw_success', { txHash: txLink }),
           { reply_markup: await getMainMenuKeyboard(config.language || 'ru') }
         );
       } else {

@@ -533,7 +533,8 @@ const {
 } = createWithdrawFeature({
   getMainMenuKeyboard,
   ensureClientInitialized,
-  ensureContractsInitialized
+  ensureContractsInitialized,
+  formatTxHashLink
 });
 
 const {
