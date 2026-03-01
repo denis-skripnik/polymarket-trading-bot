@@ -36,6 +36,7 @@ import {
   computeSharesFromUSDC,
   computeUSDCFromShares,
   getCollateralStatus,
+  getCollateralBalanceBase,
   getOnchainAllowancesUSDC,
   invalidateOnchainPositionCaches
 } from '../polymarket.js';
@@ -2170,12 +2171,6 @@ function buildLimitPriceKeyboard(t) {
     .text('+50%', 'lppct:50')
     .row()
     .text(t('cancel'), 'cancel');
-}
-
-async function getCollateralBalanceBase() {
-  await ensureClientInitialized();
-  const { balance } = await getCollateralStatus();
-  return BigInt(balance);
 }
 
 async function getTokenSharesBalanceBase(tokenId) {

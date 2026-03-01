@@ -1958,6 +1958,13 @@ export async function getCollateralStatus() {
   };
 }
 
+// Get collateral balance in base units (bigint)
+// ============================================================================
+export async function getCollateralBalanceBase() {
+  const { balance } = await getCollateralStatus();
+  return BigInt(balance);
+}
+
 async function ensureClobCollateralReady(amountUSDCBase) {
   if (!clobClient || typeof clobClient.getBalanceAllowance !== 'function') {
     return;
