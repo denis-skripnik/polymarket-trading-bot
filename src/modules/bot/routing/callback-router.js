@@ -70,6 +70,11 @@ export function createHandleCallbackRouter(deps) {
     handleInitWallet,
     handleSetAllowances,
     handleCollateralStatus,
+    startWithdrawFlow,
+    executeWithdraw,
+    handleWithdrawAddress,
+    handleWithdrawAmount,
+    handleWithdrawPercent,
     handleStartExportPk,
     handleConfirmExportPk,
     handleCancelExportPk,
@@ -519,6 +524,14 @@ export function createHandleCallbackRouter(deps) {
         await handleSetAllowances(ctx);
       } else if (data === 'collateral_status') {
         await handleCollateralStatus(ctx);
+      } else if (data === 'start_withdraw') {
+        await startWithdrawFlow(ctx);
+      } else if (data === 'confirm_withdraw') {
+        await executeWithdraw(ctx);
+      } else if (data.startsWith('withdrawpct:')) {
+        const parts = data.split(':');
+        const percent = parts[1];
+        await handleWithdrawPercent(ctx, percent);
       } else if (data === 'start_export_pk') {
         await handleStartExportPk(ctx);
       } else if (data === 'confirm_export_pk') {

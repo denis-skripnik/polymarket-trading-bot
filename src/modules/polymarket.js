@@ -1958,6 +1958,13 @@ export async function getCollateralStatus() {
   };
 }
 
+// Get collateral balance in base units (bigint)
+// ============================================================================
+export async function getCollateralBalanceBase() {
+  const { balance } = await getCollateralStatus();
+  return BigInt(balance);
+}
+
 async function ensureClobCollateralReady(amountUSDCBase) {
   if (!clobClient || typeof clobClient.getBalanceAllowance !== 'function') {
     return;
@@ -3003,6 +3010,40 @@ export async function setAllowance(tokenAddress, spender, amount) {
     async (overrides) => tokenContract.approve(spender, amount, overrides),
     { tokenAddress, spender }
   );
+}
+
+// Withdraw USDC to specified address
+export async function withdrawUSDC(toAddress, amountBase) {
+  if (!currentSigner) {
+    throw new Error('Contracts not initialized. Call initContracts() first.');
+  }
+  
+  // Validate address
+  if (!toAddress || typeof toAddress !== 'string') {
+    throw new Error('Invalid recipient address');
+  }
+  
+  const normalizedAddress = toAddress.toLowerCase().trim();
+  if (!/^0x[a-f0-9]{40}$/.test(normalizedAddress)) {
+    throw new Error('Invalid Ethereum address format');
+  }
+  
+  // Validate amount
+  if (typeof amountBase !== 'bigint' || amountBase <= 0n) {
+    throw new Error('Invalid amount');
+  }
+  
+  const tokenContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, currentSigner);
+  
+  // Check balance
+  const balance = await tokenContract.balanceOf(currentSigner.address);
+  if (balance < amountBase) {
+    throw new Error(`Insufficient balance. Available: ${formatUSDCFromBase(balance)} USDC`);
+  }
+  
+  // Execute transfer
+  const tx = await tokenContract.transfer(normalizedAddress, amountBase);
+  return await tx.wait();
 }
 
 // Check ERC1155 approval (for conditional tokens)

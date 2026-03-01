@@ -78,6 +78,7 @@ export function createSettingsFeature(deps) {
       keyboard.text(t('settings_set_allowances'), 'set_allowances').row();
       keyboard.text(t('settings_collateral_status'), 'collateral_status').row();
       keyboard.text(t('settings_export_pk'), 'start_export_pk').row();
+      keyboard.text(t('settings_withdraw'), 'start_withdraw').row();
     }
 
     keyboard.text(t('back'), 'back_menu');
