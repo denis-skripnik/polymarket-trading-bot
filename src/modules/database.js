@@ -215,6 +215,12 @@ export async function savePosition(marketId, tokenId, side, quantityBase, avgPri
     newAvgMicro = deltaAvg;
   }
 
+  // Delete if dust position (below minimum threshold)
+  if (newQtyBase < MIN_QUANTITY_BASE) {
+    const deleteStmt = db.prepare('DELETE FROM positions WHERE market_id = ? AND token_id = ?');
+    return deleteStmt.run(marketId, tokenId);
+  }
+
   const stmt = db.prepare(`
     INSERT INTO positions (market_id, token_id, side, quantity_base, avg_price_micro)
     VALUES (?, ?, ?, ?, ?)
@@ -232,6 +238,12 @@ export async function updatePosition(marketId, tokenId, quantityBase, avgPriceMi
   const qty = toBigInt(quantityBase, 'quantityBase');
   const avg = toBigInt(avgPriceMicro, 'avgPriceMicro');
 
+  // Delete if dust position
+  if (qty < MIN_QUANTITY_BASE) {
+    const deleteStmt = db.prepare('DELETE FROM positions WHERE market_id = ? AND token_id = ?');
+    return deleteStmt.run(marketId, tokenId);
+  }
+
   const stmt = db.prepare(`
     UPDATE positions
     SET quantity_base = ?, avg_price_micro = ?, updated_at = datetime('now')
@@ -247,7 +259,8 @@ export async function upsertPositionSnapshot(marketId, tokenId, side, quantityBa
   const qty = toBigInt(quantityBase, 'quantityBase');
   const avg = toBigInt(avgPriceMicro, 'avgPriceMicro');
 
-  if (qty <= 0n) {
+  // Delete if fully closed OR below dust threshold
+  if (qty <= 0n || qty < MIN_QUANTITY_BASE) {
     const stmtDelete = db.prepare('DELETE FROM positions WHERE market_id = ? AND token_id = ?');
     return stmtDelete.run(marketId, tokenId);
   }
@@ -263,6 +276,10 @@ export async function upsertPositionSnapshot(marketId, tokenId, side, quantityBa
   `);
   return stmt.run(marketId, tokenId, side, qty, avg);
 }
+
+// Minimum quantity to keep in database (0.01 shares = 10,000 base units)
+// Dust positions below this threshold will be filtered out
+const MIN_QUANTITY_BASE = 10_000n;
 
 // Replace positions table with a fresh snapshot from API.
 // Input row shape: { marketId, tokenId, side, quantityBase, avgPriceMicro }
@@ -284,7 +301,8 @@ export async function replacePositionsSnapshot(rows) {
 
       const side = String(row.side ?? 'unknown');
       const qty = toBigInt(row.quantityBase, 'quantityBase');
-      if (qty <= 0n) continue;
+      // Skip dust positions: qty <= 0 or below minimum threshold
+      if (qty <= 0n || qty < MIN_QUANTITY_BASE) continue;
 
       const avg = toBigInt(row.avgPriceMicro ?? 0, 'avgPriceMicro');
       insertStmt.run(marketId, tokenId, side, qty, avg);
@@ -313,8 +331,8 @@ export async function reducePosition(marketId, tokenId, quantityToReduce) {
   // Calculate new quantity
   const newQty = currentQty - reduceQty;
   
-  if (newQty <= 0) {
-    // Position fully closed, delete it
+  // Delete if fully closed OR below dust threshold
+  if (newQty <= 0n || newQty < MIN_QUANTITY_BASE) {
     const stmt = db.prepare('DELETE FROM positions WHERE market_id = ? AND token_id = ?');
     stmt.run(marketId, tokenId);
     return null;
