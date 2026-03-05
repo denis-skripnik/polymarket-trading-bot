@@ -9,6 +9,10 @@ const __dirname = dirname(__filename);
 const DB_DIR = join(__dirname, '..', '..', 'data');
 const DB_PATH = join(DB_DIR, 'database.sqlite');
 
+// Minimum quantity to keep in database (0.01 shares = 10,000 base units)
+// Dust positions below this threshold will be filtered out
+const MIN_QUANTITY_BASE = 10_000n;
+
 let db = null;
 
 // Initialize database and create tables
@@ -276,10 +280,6 @@ export async function upsertPositionSnapshot(marketId, tokenId, side, quantityBa
   `);
   return stmt.run(marketId, tokenId, side, qty, avg);
 }
-
-// Minimum quantity to keep in database (0.01 shares = 10,000 base units)
-// Dust positions below this threshold will be filtered out
-const MIN_QUANTITY_BASE = 10_000n;
 
 // Replace positions table with a fresh snapshot from API.
 // Input row shape: { marketId, tokenId, side, quantityBase, avgPriceMicro }
