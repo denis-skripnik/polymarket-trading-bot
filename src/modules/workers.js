@@ -723,8 +723,20 @@ export async function monitorPricesWorker() {
   const alertCooldownMs = resolvePriceAlertCooldownMs(config);
   const strategyEntryPriceMap = buildStrategyEntryPriceMap(await getActiveStrategies());
 
+  // Minimum thresholds for price alerts (same as display filter in positions.js)
+  const MIN_DISPLAY_VALUE_USD = 0.01;
+  const MIN_DISPLAY_SHARES_BASE = parseSharesToBase('0.01');
+
   const dbPositions = await getDbPositions();
-  for (const pos of dbPositions) {
+  
+  // Filter out dust positions
+  const filteredPositions = dbPositions.filter(pos => {
+    const sizeBase = parseSharesToBase(String(pos.size ?? pos.quantity ?? pos.amount ?? 0));
+    const currentValue = Number(pos.currentValue ?? pos.current_value ?? 0);
+    return sizeBase >= MIN_DISPLAY_SHARES_BASE || currentValue >= MIN_DISPLAY_VALUE_USD;
+  });
+
+  for (const pos of filteredPositions) {
     const tokenId = String(pos.token_id || '').trim();
     if (!tokenId) continue;
 
