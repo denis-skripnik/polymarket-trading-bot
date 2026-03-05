@@ -4,9 +4,9 @@ import { getTranslator } from '../../i18n.js';
 import { getPositions, formatSharesFromBase, parseSharesToBase } from '../../polymarket.js';
 import { busyLocks, userStates } from '../runtime.js';
 
-// Minimum display threshold: 0.01 USD (approximately 0.0001 shares at typical prices)
+// Minimum display threshold: $0.01 OR 0.01 shares (whichever is easier to meet)
 const MIN_DISPLAY_VALUE_USD = 0.01;
-const MIN_DISPLAY_SHARES_BASE = parseSharesToBase('0.0001');
+const MIN_DISPLAY_SHARES_BASE = parseSharesToBase('0.01');
 
 export function createPositionsFeature(deps) {
   const {
