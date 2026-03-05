@@ -1787,17 +1787,41 @@ function canRedeemPosition(position) {
   const conditionId = getPositionConditionId(position);
   if (!conditionId) return false;
 
+  // Check explicit redeemable flags first
   if (parseBooleanLike(position?.redeemable ?? position?.isRedeemable ?? position?.canRedeem)) {
     return true;
   }
 
-  return hasPositiveNumericField(position, [
+  // Check numeric amount fields
+  if (hasPositiveNumericField(position, [
     'redeemable_amount',
     'redeemableAmount',
     'claimable',
     'claimable_amount',
     'payout'
-  ]);
+  ])) {
+    return true;
+  }
+
+  // Backup check: curPrice=1 means winning position, realizedPnl=0 means not yet claimed
+  // Only applies if these fields exist in the response
+  const curPrice = position?.curPrice ?? position?.currentPrice ?? position?.cur_price;
+  const realizedPnl = position?.realizedPnl ?? position?.realized_pnl ?? position?.realizedPnl;
+  
+  if (curPrice !== undefined && Number(curPrice) === 1) {
+    // If realizedPnl exists and is > 0, already claimed
+    if (realizedPnl !== undefined) {
+      const pnl = Number(realizedPnl);
+      if (pnl === 0 || pnl === null || isNaN(pnl)) {
+        return true;
+      }
+    } else {
+      // No realizedPnl field = not yet claimed
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function canSellPosition(position) {
