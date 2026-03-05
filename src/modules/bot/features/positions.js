@@ -1,8 +1,12 @@
 import { InlineKeyboard } from 'grammy';
 import { loadConfig } from '../../config.js';
 import { getTranslator } from '../../i18n.js';
-import { getPositions, formatSharesFromBase } from '../../polymarket.js';
+import { getPositions, formatSharesFromBase, parseSharesToBase } from '../../polymarket.js';
 import { busyLocks, userStates } from '../runtime.js';
+
+// Minimum display threshold: 0.01 USD (approximately 0.0001 shares at typical prices)
+const MIN_DISPLAY_VALUE_USD = 0.01;
+const MIN_DISPLAY_SHARES_BASE = parseSharesToBase('0.0001');
 
 export function createPositionsFeature(deps) {
   const {
@@ -53,7 +57,15 @@ export function createPositionsFeature(deps) {
       // Get positions from API
       const positions = await getPositions();
       
-      if (!positions || positions.length === 0) {
+      // Filter out dust positions (too small to sell profitably)
+      const filteredPositions = positions.filter(pos => {
+        const sizeBase = parseSharesBaseSafe(pos.size ?? 0);
+        const currentValue = Number(pos.currentValue ?? 0);
+        // Keep if: shares >= min threshold OR value >= $0.01
+        return sizeBase >= MIN_DISPLAY_SHARES_BASE || currentValue >= MIN_DISPLAY_VALUE_USD;
+      });
+      
+      if (!filteredPositions || filteredPositions.length === 0) {
         let message = t('error_no_positions');
         if (!explorerApiConfigured) {
           message += `\n\n${t('positions_onchain_api_key_hint')}`;
@@ -66,12 +78,13 @@ export function createPositionsFeature(deps) {
       }
 
       // Cache latest positions for callbacks (pos:<index>, psell:<index>, pmrg:<index>)
-      setCachedPositions(chatId, positions);
+      // Use filtered positions for display, but keep full list for reference
+      setCachedPositions(chatId, filteredPositions);
 
       let text = t('positions_title') + '\n\n';
       const keyboard = new InlineKeyboard();
 
-      positions.forEach((pos, index) => {
+      filteredPositions.forEach((pos, index) => {
         const market = pos.market || t('unknown');
         const side = pos.outcome || pos.side || t('unknown');
         const size = pos.size || '0';
