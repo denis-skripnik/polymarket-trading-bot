@@ -26,6 +26,46 @@ Single-user Telegram bot for trading on Polymarket (Polygon), with market/limit 
 
 ## Installation
 
+### Option 1: Auto Install (Recommended)
+
+Download the bot and run the installer for your OS:
+
+**Linux:**
+```bash
+# Clone the repository
+git clone https://github.com/denis-skripnik/polymarket-trading-bot.git
+cd polymarket-trading-bot
+
+# Run installer
+chmod +x install/install.sh
+./install/install.sh
+```
+
+**Windows:**
+```powershell
+# Clone the repository (or download as ZIP)
+git clone https://github.com/denis-skripnik/polymarket-trading-bot.git
+cd polymarket-trading-bot
+
+# Run installer (in PowerShell or Command Prompt)
+.\install\windows_install.bat
+```
+
+The installer will:
+1. Check for Node.js 22+ (installs if missing)
+2. Install dependencies
+3. Check for .env file (you must create it first!)
+4. Install PM2 if needed
+5. Start the bot with PM2
+
+**Important:** Before running the installer, copy `.env.example` to `.env` and fill in your credentials:
+- `TELEGRAM_BOT_TOKEN` - from BotFather
+- `TELEGRAM_ALLOWED_USER_ID` - your Telegram user ID
+
+If .env is not created, the installer will prompt you. Run it again after creating .env to start the bot.
+
+### Option 2: Manual Installation
+
 1. Clone the repository.
 2. Install dependencies.
 
