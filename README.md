@@ -2,6 +2,34 @@
 
 Single-user Telegram bot for trading on Polymarket (Polygon), with market/limit orders, split/merge flows, strategy automation, and background monitoring workers.
 
+## Quick Install on linux
+
+Create a Telegram bot through [Bot Father](https://t.me/BotFather).
+
+Connect to your server via ssh, copy the command:
+
+```bash
+curl -LsSf https://github.com/denis-skripnik/polymarket-trading-bot/raw/refs/heads/main/install.sh | bash
+```
+
+Then open the file `.env` for editing
+
+```bash
+nano .env
+```
+
+Insert the Telegram bot token into the value of the corresponding variable (after the equals sign).
+
+Save the changes.
+
+Run the command to launch the bot:
+
+```bash
+npm run pm2:start
+```
+
+---
+
 ## Features
 
 - Single-user private access via `TELEGRAM_ALLOWED_USER_ID`
