@@ -10,7 +10,8 @@ import {
   setAllAllowances,
   getCollateralStatus,
   getOnchainAllowancesUSDC,
-  formatUSDCFromBase
+  formatUSDCFromBase,
+  wrapUsdceToPusd
 } from '../../polymarket.js';
 import {
   busyLocks,
@@ -208,7 +209,7 @@ export function createSecurityFeature(deps) {
         const { allowances } = await getCollateralStatus();
         const ctfAllowanceBig = BigInt(allowances.ctfExchange);
         const ctfAllowanceDisplay = formatUSDCFromBase(ctfAllowanceBig);
-        text += `\n<b>${t('clob_collateral_allowance')}</b>: ${ctfAllowanceDisplay} USDC`;
+        text += `\n<b>${t('clob_collateral_allowance')}</b>: ${ctfAllowanceDisplay} pUSD`;
       } catch (clobError) {
         text += `\n<i>${t('clob_allowance_unavailable')}</i>`;
       }
@@ -256,24 +257,34 @@ export function createSecurityFeature(deps) {
       await initContracts(signer, getPolygonRpcUrl());
 
       // Get collateral status
-      const { balance, allowances } = await getCollateralStatus();
+      const { balance, usdceBalance, onrampAllowance, allowances } = await getCollateralStatus();
 
       // Format values from base units
       const balanceBig = BigInt(balance);
+      const usdceBalanceBig = BigInt(usdceBalance || '0');
+      const onrampAllowanceBig = BigInt(onrampAllowance || '0');
       const ctfAllowanceBig = BigInt(allowances.ctfExchange);
       const negRiskExchangeAllowanceBig = BigInt(allowances.negRiskExchange);
       const negRiskAdapterAllowanceBig = BigInt(allowances.negRiskAdapter);
       const balanceDisplay = formatUSDCFromBase(balanceBig);
+      const usdceBalanceDisplay = formatUSDCFromBase(usdceBalanceBig);
+      const onrampAllowanceDisplay = formatUSDCFromBase(onrampAllowanceBig);
       const ctfAllowanceDisplay = formatUSDCFromBase(ctfAllowanceBig);
       const negRiskExchangeAllowanceDisplay = formatUSDCFromBase(negRiskExchangeAllowanceBig);
       const negRiskAdapterAllowanceDisplay = formatUSDCFromBase(negRiskAdapterAllowanceBig);
 
       let text = `<b>${t('collateral_status_title')}</b>\n\n` +
-                `${t('collateral_balance', { amount: balanceDisplay })}\n\n` +
+                `${t('collateral_balance', { amount: balanceDisplay })}\n` +
+                `${t('collateral_balance_usdce', { amount: usdceBalanceDisplay })}\n` +
+                `${t('collateral_onramp_allowance', { amount: onrampAllowanceDisplay })}\n\n` +
                 `<b>${t('clob_allowances_title')}</b>\n` +
                 `${t('allowance_ctf_exchange', { amount: ctfAllowanceDisplay })}\n` +
                 `${t('allowance_neg_risk_exchange', { amount: negRiskExchangeAllowanceDisplay })}\n` +
                 `${t('allowance_neg_risk_adapter', { amount: negRiskAdapterAllowanceDisplay })}`;
+
+      if (usdceBalanceBig > 0n) {
+        text += `\n\n${t('collateral_wrap_hint', { amount: usdceBalanceDisplay })}`;
+      }
 
       // Get on-chain allowances for diagnostic
       try {
@@ -282,14 +293,20 @@ export function createSecurityFeature(deps) {
         onchainAllowances.forEach(item => {
           const allowanceBn = BigInt(item.allowance);
           const display = formatUSDCFromBase(allowanceBn);
-          text += `\n${item.name}: ${display} USDC`;
+          text += `\n${item.name}: ${display} pUSD`;
         });
       } catch (onchainError) {
         text += `\n\n<i>${t('onchain_allowances_unavailable')}</i>`;
       }
 
+      const keyboard = new InlineKeyboard();
+      if (usdceBalanceBig > 0n) {
+        keyboard.text(t('collateral_wrap_action'), 'wrap_usdce_all').row();
+      }
+      keyboard.text(t('back'), 'settings');
+
       await ctx.editMessageText(text, {
-        reply_markup: new InlineKeyboard().text(t('back'), 'settings'),
+        reply_markup: keyboard,
         parse_mode: 'HTML'
       });
     } catch (error) {
@@ -297,6 +314,66 @@ export function createSecurityFeature(deps) {
       safeLogError(ctxLog, error);
       await ctx.editMessageText(t('error_generic'), {
         reply_markup: new InlineKeyboard().text(t('try_again'), 'collateral_status').text(t('back'), 'settings')
+      });
+    } finally {
+      busyLocks.delete(chatId);
+    }
+  }
+
+  async function handleWrapAllUsdce(ctx) {
+    const config = await loadConfig();
+    const t = await getTranslator(config.language || 'ru');
+
+    if (!config.walletAddress) {
+      await ctx.editMessageText(t('error_no_wallet'), {
+        reply_markup: new InlineKeyboard().text(t('back'), 'settings')
+      });
+      return;
+    }
+
+    const chatId = ctx.chat.id;
+    busyLocks.set(chatId, true);
+
+    try {
+      await ctx.editMessageText(t('loading'));
+
+      const privateKey = await getDecryptedPrivateKey();
+      const signer = new Wallet(privateKey);
+      await initContracts(signer, getPolygonRpcUrl());
+      await ensureClientInitialized();
+
+      const { usdceBalance } = await getCollateralStatus();
+      const amountBase = BigInt(usdceBalance || '0');
+      if (amountBase <= 0n) {
+        await ctx.editMessageText(t('collateral_wrap_unavailable'), {
+          reply_markup: new InlineKeyboard().text(t('back'), 'settings')
+        });
+        return;
+      }
+
+      const receipt = await wrapUsdceToPusd(amountBase);
+      const hashDisplay = formatTxHashLink
+        ? formatTxHashLink(receipt.hash)
+        : escapeHtml(String(receipt.hash || t('unknown')));
+      await ctx.editMessageText(t('collateral_wrap_success', {
+        amount: formatUSDCFromBase(amountBase),
+        hash: hashDisplay
+      }), {
+        reply_markup: new InlineKeyboard()
+          .text(t('refresh'), 'collateral_status')
+          .row()
+          .text(t('back'), 'settings'),
+        parse_mode: 'HTML'
+      });
+    } catch (error) {
+      const ctxLog = createContext('bot', 'handleWrapAllUsdce');
+      safeLogError(ctxLog, error);
+      const message = String(error?.message || t('error_generic')).slice(0, 220);
+      await ctx.editMessageText(t('error_order_failed', { message }), {
+        reply_markup: new InlineKeyboard()
+          .text(t('refresh'), 'collateral_status')
+          .row()
+          .text(t('back'), 'settings')
       });
     } finally {
       busyLocks.delete(chatId);
@@ -456,6 +533,7 @@ export function createSecurityFeature(deps) {
     handleStartExportPk,
     handleConfirmExportPk,
     handleCancelExportPk,
+    handleWrapAllUsdce,
     handleExportConfirmation,
     ensureClientInitialized,
     ensureContractsInitialized,

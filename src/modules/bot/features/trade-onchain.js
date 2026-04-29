@@ -10,6 +10,7 @@ import {
   split,
   merge,
   redeem,
+  getCollateralStatus,
   mapErrorToUserMessage,
   parseUSDCToBase,
   formatUSDCFromBase,
@@ -29,6 +30,17 @@ import {
   MIN_LIMIT_ORDER_SHARES_BASE
 } from '../constants.js';
 import { userStates, busyLocks } from '../runtime.js';
+
+async function buildWrapNeededMessage(t) {
+  try {
+    const { usdceBalance } = await getCollateralStatus();
+    const amountBase = BigInt(usdceBalance || '0');
+    if (amountBase > 0n) {
+      return t('collateral_wrap_hint', { amount: formatUSDCFromBase(amountBase) });
+    }
+  } catch {}
+  return t('error_insufficient_funds');
+}
 
 export function createTradeOnchainFeature(deps) {
   const {
@@ -299,7 +311,7 @@ async function handleStrategySplitPercent(ctx, percent) {
 
     const balanceBase = await getCollateralBalanceBase();
     if (balanceBase <= 0n) {
-      await ctx.editMessageText(t('error_insufficient_funds'), {
+      await ctx.editMessageText(await buildWrapNeededMessage(t), {
         reply_markup: new InlineKeyboard().text(t('back'), 'back_menu')
       });
       return;
@@ -721,7 +733,7 @@ async function handleSplitPercent(ctx, percent) {
 
     const balanceBase = await getCollateralBalanceBase();
     if (balanceBase <= 0n) {
-      await ctx.editMessageText(t('error_insufficient_funds'), {
+      await ctx.editMessageText(await buildWrapNeededMessage(t), {
         reply_markup: new InlineKeyboard().text(t('back'), 'back_menu')
       });
       return;
@@ -962,7 +974,7 @@ async function handleMergeAmount(ctx, state, text) {
   const estimatedUsdcBase = sharesBase;
   const confirmText =
     `${t('merge_confirm', { amount: formatSharesFromBase(sharesBase) })}\n\n` +
-    `~ ${formatUSDCFromBase(estimatedUsdcBase)} USDC`;
+    `~ ${formatUSDCFromBase(estimatedUsdcBase)} pUSD`;
   
   const keyboard = new InlineKeyboard()
     .text(t('confirm'), 'confirm_merge')
@@ -1008,7 +1020,7 @@ async function handleMergeMax(ctx) {
 
   const confirmText =
     `${t('merge_confirm', { amount: formatSharesFromBase(maxMergeBase) })}\n\n` +
-    `~ ${formatUSDCFromBase(maxMergeBase)} USDC`;
+    `~ ${formatUSDCFromBase(maxMergeBase)} pUSD`;
 
   const keyboard = new InlineKeyboard()
     .text(t('confirm'), 'confirm_merge')

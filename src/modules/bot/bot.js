@@ -319,6 +319,7 @@ const handleCallback = createHandleCallbackRouter({
   handleInitWallet,
   handleSetAllowances,
   handleCollateralStatus,
+  handleWrapAllUsdce,
   handleStartExportPk,
   handleConfirmExportPk,
   handleCancelExportPk,
@@ -481,6 +482,7 @@ const {
   handleInitWallet: handleInitWalletFeature,
   handleSetAllowances: handleSetAllowancesFeature,
   handleCollateralStatus: handleCollateralStatusFeature,
+  handleWrapAllUsdce: handleWrapAllUsdceFeature,
   handleStartExportPk: handleStartExportPkFeature,
   handleConfirmExportPk: handleConfirmExportPkFeature,
   handleCancelExportPk: handleCancelExportPkFeature,
@@ -2755,6 +2757,10 @@ async function handleSetAllowances(ctx) {
 // Handle collateral status display
 async function handleCollateralStatus(ctx) {
   await handleCollateralStatusFeature(ctx);
+}
+
+async function handleWrapAllUsdce(ctx) {
+  await handleWrapAllUsdceFeature(ctx);
 }
 
 // Handle start export private key flow

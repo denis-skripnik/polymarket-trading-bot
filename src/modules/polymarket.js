@@ -1,4 +1,4 @@
-﻿import { ClobClient, Side, OrderType, AssetType, createL2Headers } from '@polymarket/clob-client';
+import { ClobClient, Side, OrderType, AssetType, Chain, createL2Headers } from '@polymarket/clob-client-v2';
 import { ethers } from 'ethers';
 import { getPolygonRpcUrl } from './config.js';
 import { patchProviderSendForProxy } from './proxy.js';
@@ -8,12 +8,15 @@ import {
   GAMMA_API_URL,
   DATA_API_URL,
   USDC_ADDRESS,
+  USDCE_ADDRESS,
   CTF_ADDRESS,
   CTF_EXCHANGE_ADDRESS,
   NEG_RISK_CTF_EXCHANGE,
   NEG_RISK_ADAPTER,
+  COLLATERAL_ONRAMP_ADDRESS,
   CTF_ABI,
   ERC20_ABI,
+  COLLATERAL_ONRAMP_ABI,
   USDC_DECIMALS,
   PARENT_COLLECTION_ID,
   BINARY_PARTITION
@@ -73,14 +76,13 @@ export async function initClient(privateKey, apiCreds) {
   const normalizedCreds = normalizeApiCreds(apiCreds);
   clobUserAddress = signer.address.toLowerCase();
   
-  clobClient = new ClobClient(
-    CLOB_API_URL,
-    POLYGON_CHAIN_ID,
+  clobClient = new ClobClient({
+    host: CLOB_API_URL,
+    chain: Chain.POLYGON,
     signer,
-    normalizedCreds,
-    0, // signature_type: EOA
-    signer.address // funder: same as signer
-  );
+    creds: normalizedCreds,
+    funderAddress: signer.address
+  });
   
   return clobClient;
 }
@@ -833,7 +835,14 @@ export function mapErrorToUserMessage(error) {
   if (lower.includes('insufficient collateral readiness')) {
     return {
       key: 'error_order_failed',
-      params: { message: 'Not enough USDC balance or allowance for this order. Run Settings -> Set allowances and check wallet USDC balance.' }
+      params: { message: 'Not enough pUSD balance or allowance for this order. Run Settings -> Set allowances and check wallet pUSD balance. If you only hold USDC.e, open Settings -> Collateral Status and wrap it into pUSD.' }
+    };
+  }
+
+  if (lower.includes('usdc.e')) {
+    return {
+      key: 'error_order_failed',
+      params: { message }
     };
   }
   
@@ -1944,16 +1953,44 @@ export async function getCollateralStatus() {
   });
 
   const balance = safeToBigInt(data?.balance);
+  const clobAllowance = safeToBigInt(data?.allowance);
+  let onchainAllowances = null;
+  let usdceBalance = 0n;
+  let onrampAllowance = 0n;
 
-  // getBalanceAllowance returns allowances map per spender, not single allowance
-  const allowancesMap = data?.allowances || {};
+  if (currentSigner) {
+    try {
+      const owner = await getSignerAddress(currentSigner);
+      if (usdcContract) {
+        onchainAllowances = await getOnchainAllowancesUSDC(owner);
+      }
+      if (usdceContract) {
+        const [walletUsdceBalance, walletOnrampAllowance] = await Promise.all([
+          usdceContract.balanceOf(owner),
+          usdceContract.allowance(owner, COLLATERAL_ONRAMP_ADDRESS)
+        ]);
+        usdceBalance = safeToBigInt(walletUsdceBalance) ?? 0n;
+        onrampAllowance = safeToBigInt(walletOnrampAllowance) ?? 0n;
+      }
+    } catch {}
+  }
+
+  const allowanceByAddress = new Map(
+    Array.isArray(onchainAllowances)
+      ? onchainAllowances.map((item) => [String(item.address || '').toLowerCase(), String(item.allowance || '0')])
+      : []
+  );
+  const fallbackAllowance = clobAllowance !== null ? clobAllowance.toString() : '0';
 
   return {
     balance: balance !== null ? balance.toString() : '0',
+    usdceBalance: usdceBalance.toString(),
+    allowance: fallbackAllowance,
+    onrampAllowance: onrampAllowance.toString(),
     allowances: {
-      ctfExchange: allowancesMap[CTF_EXCHANGE_ADDRESS] ?? '0',
-      negRiskExchange: allowancesMap[NEG_RISK_CTF_EXCHANGE] ?? '0',
-      negRiskAdapter: allowancesMap[NEG_RISK_ADAPTER] ?? '0'
+      ctfExchange: allowanceByAddress.get(CTF_EXCHANGE_ADDRESS.toLowerCase()) ?? fallbackAllowance,
+      negRiskExchange: allowanceByAddress.get(NEG_RISK_CTF_EXCHANGE.toLowerCase()) ?? fallbackAllowance,
+      negRiskAdapter: allowanceByAddress.get(NEG_RISK_ADAPTER.toLowerCase()) ?? fallbackAllowance
     }
   };
 }
@@ -1970,9 +2007,10 @@ async function ensureClobCollateralReady(amountUSDCBase) {
     return;
   }
 
-  const { balance, allowances } = await getCollateralStatus();
+  const { balance, allowance, allowances, usdceBalance } = await getCollateralStatus();
   const balanceBig = safeToBigInt(balance);
-  const allowanceBig = safeToBigInt(allowances.ctfExchange);
+  const allowanceBig = safeToBigInt(allowance ?? allowances.ctfExchange);
+  const usdceBalanceBig = safeToBigInt(usdceBalance) ?? 0n;
 
   if (balanceBig === null || allowanceBig === null) {
     return;
@@ -1982,22 +2020,26 @@ async function ensureClobCollateralReady(amountUSDCBase) {
   const requiredDisplay = formatUSDCFromBase(amountUSDCBase);
   const balanceDisplay = formatUSDCFromBase(balanceBig);
   const allowanceDisplay = formatUSDCFromBase(allowanceBig);
+  const usdceBalanceDisplay = formatUSDCFromBase(usdceBalanceBig);
+  const wrapHint = usdceBalanceBig > 0n
+    ? ` Wallet also has ${usdceBalanceDisplay} USDC.e available to wrap into pUSD via Settings → Collateral Status.`
+    : '';
 
   if (balanceBig < amountUSDCBase && allowanceBig < amountUSDCBase) {
     throw new Error(
-      `Insufficient balance and allowance. Balance: ${balanceDisplay} USDC, Allowance: ${allowanceDisplay} USDC, Required: ${requiredDisplay} USDC`
+      `Insufficient balance and allowance. Balance: ${balanceDisplay} pUSD, Allowance: ${allowanceDisplay} pUSD, Required: ${requiredDisplay} pUSD.${wrapHint}`
     );
   }
 
   if (balanceBig < amountUSDCBase) {
     throw new Error(
-      `Insufficient balance. Balance: ${balanceDisplay} USDC, Required: ${requiredDisplay} USDC`
+      `Insufficient balance. Balance: ${balanceDisplay} pUSD, Required: ${requiredDisplay} pUSD.${wrapHint}`
     );
   }
 
   if (allowanceBig < amountUSDCBase) {
     throw new Error(
-      `Insufficient allowance. Allowance: ${allowanceDisplay} USDC, Required: ${requiredDisplay} USDC. Please go to Settings → Set Allowances.`
+      `Insufficient allowance. Allowance: ${allowanceDisplay} pUSD, Required: ${requiredDisplay} pUSD. Please go to Settings → Set Allowances.`
     );
   }
 }
@@ -2290,6 +2332,7 @@ export async function placeMarketBuyFOK(tokenId, amountUSDC) {
     throw new Error('amountUSDC must be positive');
   }
   const amountUSDCDisplay = formatUSDCFromBase(amountUSDCBase);
+  const collateralBalanceBase = await getCollateralBalanceBase();
 
   // Ensure CLOB backend sees fresh collateral balance/allowance.
   await refreshClobBalanceAllowance(AssetType.COLLATERAL, tokenId);
@@ -2332,7 +2375,8 @@ export async function placeMarketBuyFOK(tokenId, amountUSDC) {
             tokenID: tokenId,
             side: Side.BUY,
             amount: amountUSDCNum,
-            price: currentMarketablePriceNum
+            price: currentMarketablePriceNum,
+            userUSDCBalance: Number(formatUSDCFromBase(collateralBalanceBase))
           },
           orderOptions,
           OrderType.FOK
@@ -2751,8 +2795,10 @@ export async function checkBalance(address) {
 
 let provider = null;
 let usdcContract = null;
+let usdceContract = null;
 let ctfContract = null;
 let negRiskAdapterContract = null;
+let collateralOnrampContract = null;
 let currentSigner = null;
 
 const DEFAULT_POLYGON_RPC_URLS = [
@@ -2982,10 +3028,51 @@ export async function initContracts(signer, rpcUrl) {
   const connectedSigner = signer.connect(provider);
   currentSigner = connectedSigner;
   usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, connectedSigner);
+  usdceContract = new ethers.Contract(USDCE_ADDRESS, ERC20_ABI, connectedSigner);
   ctfContract = new ethers.Contract(CTF_ADDRESS, CTF_ABI, connectedSigner);
   negRiskAdapterContract = new ethers.Contract(NEG_RISK_ADAPTER, NEG_RISK_ADAPTER_ABI, connectedSigner);
+  collateralOnrampContract = new ethers.Contract(COLLATERAL_ONRAMP_ADDRESS, COLLATERAL_ONRAMP_ABI, connectedSigner);
   
-  return { provider, usdcContract, ctfContract, negRiskAdapterContract };
+  return { provider, usdcContract, usdceContract, ctfContract, negRiskAdapterContract, collateralOnrampContract };
+}
+
+export async function wrapUsdceToPusd(amountBase) {
+  if (!currentSigner || !usdceContract || !collateralOnrampContract) {
+    throw new Error('Contracts not initialized. Call initContracts() first.');
+  }
+
+  if (typeof amountBase !== 'bigint' || amountBase <= 0n) {
+    throw new Error('Invalid wrap amount');
+  }
+
+  const owner = await getSignerAddress(currentSigner);
+  const usdceBalance = await usdceContract.balanceOf(owner);
+  if (usdceBalance.lt(amountBase)) {
+    throw new Error(`Insufficient USDC.e balance. Available: ${formatUSDCFromBase(usdceBalance)} USDC.e`);
+  }
+
+  const onrampAllowance = await usdceContract.allowance(owner, COLLATERAL_ONRAMP_ADDRESS);
+  if (onrampAllowance.lt(amountBase)) {
+    await sendWithAdaptiveApprovalGas(
+      'wrapUsdceToPusd',
+      async (overrides) => usdceContract.approve(COLLATERAL_ONRAMP_ADDRESS, ethers.constants.MaxUint256, overrides),
+      { type: 'USDC.e->CollateralOnramp' }
+    );
+  }
+
+  const receipt = await sendWithAdaptiveApprovalGas(
+    'wrapUsdceToPusd',
+    async (overrides) => collateralOnrampContract.wrap(USDCE_ADDRESS, owner, amountBase, overrides),
+    { type: 'CollateralOnramp.wrap', amountBase: amountBase.toString() }
+  );
+
+  if (clobClient) {
+    try {
+      await refreshClobBalanceAllowance(AssetType.COLLATERAL, null);
+    } catch {}
+  }
+
+  return receipt;
 }
 
 // Check ERC20 allowance for any token
@@ -3038,7 +3125,7 @@ export async function withdrawUSDC(toAddress, amountBase) {
   // Check balance
   const balance = await tokenContract.balanceOf(currentSigner.address);
   if (balance < amountBase) {
-    throw new Error(`Insufficient balance. Available: ${formatUSDCFromBase(balance)} USDC`);
+    throw new Error(`Insufficient balance. Available: ${formatUSDCFromBase(balance)} pUSD`);
   }
   
   // Execute transfer with adaptive gas
@@ -3293,13 +3380,28 @@ async function executeNegRiskLegacySellFallback({ tokenId, sharesBase, condition
 
 // Set all required allowances (one-time setup)
 export async function setAllAllowances(signer) {
-  const { usdcContract: usdc, ctfContract: ctf } = await initContracts(
+  const { usdcContract: usdc, usdceContract: usdce, ctfContract: ctf } = await initContracts(
     signer,
     getPolygonRpcUrl()
   );
   const owner = await getSignerAddress(signer);
 
   const results = [];
+
+  // 0) USDC.e -> Collateral Onramp (for pUSD wrapping)
+  const allowanceOnramp = await usdce.allowance(owner, COLLATERAL_ONRAMP_ADDRESS);
+  if (isBelowMinAmount(allowanceOnramp, MIN_USDC_ALLOWANCE_BASE)) {
+    const ctx = createContext('polymarket', 'setAllAllowances');
+    safeLogInfo(ctx, 'Setting USDC.e allowance for Collateral Onramp', {
+      minAllowanceUSDC: MIN_USDC_ALLOWANCE_USDC
+    });
+    const receipt0 = await sendWithAdaptiveApprovalGas(
+      'setAllAllowances',
+      async (overrides) => usdce.approve(COLLATERAL_ONRAMP_ADDRESS, ethers.constants.MaxUint256, overrides),
+      { type: 'USDC.e->CollateralOnramp' }
+    );
+    results.push({ type: 'USDC.e->CollateralOnramp', hash: receipt0.hash });
+  }
 
   // 1) USDC -> CTF Contract (for split)
   const allowanceSplit = await usdc.allowance(owner, CTF_ADDRESS);
@@ -3598,4 +3700,3 @@ export async function redeem(conditionId) {
     }
   );
 }
-

@@ -9,8 +9,9 @@ Single-user Telegram bot for trading on Polymarket (Polygon), with market/limit 
 - Quick open by Polymarket URL (`/event/<event-slug>` or `/event/<event-slug>/<market-slug>`)
 - Market orders (FOK) and limit orders (GTC)
 - Split/merge via Conditional Tokens Framework contracts
-- Withdraw USDC to external wallet
-- Strategy flow from market screen: split USDC into YES/NO, place two take-profit SELL limit orders, and track strategy state in SQLite
+- Wrap USDC.e to pUSD from Telegram settings for CLOB V2 collateral
+- Withdraw pUSD collateral to external wallet
+- Strategy flow from market screen: split pUSD into YES/NO, place two take-profit SELL limit orders, and track strategy state in SQLite
 - Positions, orders, and strategies views in Telegram
 - Background workers for position sync, order reconciliation, price alerts, and strategy monitoring
 - Strategy market alerts: watcher scans active markets and notifies when YES ask and NO ask are both below strategy max ask
@@ -154,7 +155,7 @@ Polygon approve gas tuning:
 - `POLYGON_MIN_MAX_FEE_GWEI` (default `60`)
 - `POLYGON_APPROVE_GAS_RETRY_COUNT` (default `3`)
 - `POLYGON_APPROVE_GAS_BUMP_MULTIPLIER` (default `1.5`)
-- `POLYGON_MIN_USDC_ALLOWANCE_USDC` (default `1000`)
+- `POLYGON_MIN_USDC_ALLOWANCE_USDC` (default `1000`, despite the legacy env name it now applies to pUSD collateral)
 
 ## Run
 
@@ -217,12 +218,18 @@ Secure wallet migration scripts:
 
 See [Secure Device Migration (No Bot Import)](#secure-device-migration-no-bot-import) for full commands and options.
 
+## Collateral Notes (CLOB V2)
+
+- CLOB V2 trading collateral is `pUSD`, not raw `USDC.e`.
+- If the wallet holds `USDC.e` but not enough `pUSD`, use `Settings -> Collateral Status` or `Settings -> Wrap USDC.e → pUSD` in the bot.
+- The bot sets approvals for both pUSD trading contracts and the `CollateralOnramp` contract when you run `Settings -> Set Allowances`.
+
 ## First-Time Setup in Bot
 
 1. Send `/start`.
 2. Select language (EN/RU).
 3. Open `Settings -> Initialize Wallet`.
-4. Fund generated wallet with USDC on Polygon.
+4. Fund generated wallet with pUSD on Polygon, or send USDC.e and convert it via `Settings -> Wrap USDC.e → pUSD`.
 5. Open `Settings -> Set Allowances`.
 6. Start trading from `Markets`.
 
@@ -301,7 +308,7 @@ Other menus:
 - `Positions`: view current positions, open sell/merge/redeem actions from a position
 - `Orders`: view and cancel cancellable orders
 - `My Strategies`: inspect strategy legs and close a strategy manually
-- `Settings`: language, strategy params, notification params, allowances, collateral status, withdraw funds, private key export
+- `Settings`: language, strategy params, notification params, allowances, pUSD collateral status, USDC.e → pUSD wrap action, withdraw funds, private key export
 
 Open by URL:
 

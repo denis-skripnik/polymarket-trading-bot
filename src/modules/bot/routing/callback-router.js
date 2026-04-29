@@ -70,6 +70,7 @@ export function createHandleCallbackRouter(deps) {
     handleInitWallet,
     handleSetAllowances,
     handleCollateralStatus,
+    handleWrapAllUsdce,
     startWithdrawFlow,
     executeWithdraw,
     handleWithdrawAddress,
@@ -524,6 +525,8 @@ export function createHandleCallbackRouter(deps) {
         await handleSetAllowances(ctx);
       } else if (data === 'collateral_status') {
         await handleCollateralStatus(ctx);
+      } else if (data === 'wrap_usdce_all') {
+        await handleWrapAllUsdce(ctx);
       } else if (data === 'start_withdraw') {
         await startWithdrawFlow(ctx);
       } else if (data === 'confirm_withdraw') {

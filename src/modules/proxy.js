@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { createRequire } from 'module';
+import path from 'path';
 
 const DISABLED_PROXY_VALUES = new Set([
   '',
@@ -25,6 +26,18 @@ const DEFAULT_RPC_TIMEOUT_MS = 120_000;
 const DEFAULT_OUTBOUND_HTTP_TIMEOUT_MS = 20_000;
 
 const require = createRequire(import.meta.url);
+const CLOB_CLIENT_PACKAGES = [
+  '@polymarket/clob-client-v2',
+  '@polymarket/clob-client'
+];
+
+function resolveClobPackageEntry(packageName) {
+  try {
+    return require.resolve(packageName);
+  } catch {
+    return '';
+  }
+}
 
 let cachedConfig = null;
 let cachedAgent = null;
@@ -174,61 +187,67 @@ function applyAxiosDefaults(timeoutMs, agent) {
   const rootAxiosPatched = applyAxiosClientDefaults(axios, timeoutMs, agent) || patchModule('axios');
   let clobAxiosPatched = false;
 
-  clobAxiosPatched = patchModule('@polymarket/clob-client/node_modules/axios') || clobAxiosPatched;
+  for (const packageName of CLOB_CLIENT_PACKAGES) {
+    clobAxiosPatched = patchModule(`${packageName}/node_modules/axios`) || clobAxiosPatched;
 
-  try {
-    const clobHttpHelpersPath = require.resolve('@polymarket/clob-client/dist/http-helpers/index.js');
-    const clobRequire = createRequire(clobHttpHelpersPath);
-    clobAxiosPatched = patchModule('axios', clobRequire) || clobAxiosPatched;
-  } catch {}
+    const clobEntryPath = resolveClobPackageEntry(packageName);
+    if (clobEntryPath) {
+      const clobRequire = createRequire(clobEntryPath);
+      clobAxiosPatched = patchModule('axios', clobRequire) || clobAxiosPatched;
+    }
+  }
 
   return { rootAxiosPatched, clobAxiosPatched };
 }
 
 function patchClobHttpHelpersRequest(timeoutMs, agent) {
-  try {
-    const clobHttpHelpersPath = require.resolve('@polymarket/clob-client/dist/http-helpers/index.js');
-    const clobRequire = createRequire(clobHttpHelpersPath);
-    const clobHttpHelpers = clobRequire('@polymarket/clob-client/dist/http-helpers/index.js');
-    const clobAxiosModule = clobRequire('axios');
-    const clobAxios = clobAxiosModule?.default || clobAxiosModule;
-    const browserOrNode = clobRequire('browser-or-node');
+  for (const packageName of CLOB_CLIENT_PACKAGES) {
+    try {
+      const clobEntryPath = resolveClobPackageEntry(packageName);
+      if (!clobEntryPath) continue;
+      const clobHttpHelpersPath = path.join(path.dirname(clobEntryPath), 'http-helpers', 'index.js');
+      const clobRequire = createRequire(clobHttpHelpersPath);
+      const clobHttpHelpers = clobRequire(clobHttpHelpersPath);
+      const clobAxiosModule = clobRequire('axios');
+      const clobAxios = clobAxiosModule?.default || clobAxiosModule;
+      const browserOrNode = clobRequire('browser-or-node');
 
-    if (!clobHttpHelpers || typeof clobHttpHelpers !== 'object') return false;
-    if (typeof clobHttpHelpers.request !== 'function') return false;
-    if (!clobAxios || typeof clobAxios !== 'function') return false;
-    if (clobHttpHelpers.request.__proxyPatched) return true;
+      if (!clobHttpHelpers || typeof clobHttpHelpers !== 'object') continue;
+      if (typeof clobHttpHelpers.request !== 'function') continue;
+      if (!clobAxios || typeof clobAxios !== 'function') continue;
+      if (clobHttpHelpers.request.__proxyPatched) return true;
 
-    clobHttpHelpers.request = async function patchedClobRequest(endpoint, method, headers, data, params) {
-      if (!browserOrNode?.isBrowser) {
-        const mutableHeaders = headers && typeof headers === 'object' ? headers : {};
-        mutableHeaders['User-Agent'] = '@polymarket/clob-client';
-        mutableHeaders.Accept = '*/*';
-        mutableHeaders.Connection = 'keep-alive';
-        mutableHeaders['Content-Type'] = 'application/json';
-        if (method === 'GET') {
-          mutableHeaders['Accept-Encoding'] = 'gzip';
+      clobHttpHelpers.request = async function patchedClobRequest(endpoint, method, headers, data, params) {
+        if (!browserOrNode?.isBrowser) {
+          const mutableHeaders = headers && typeof headers === 'object' ? headers : {};
+          mutableHeaders['User-Agent'] = packageName;
+          mutableHeaders.Accept = '*/*';
+          mutableHeaders.Connection = 'keep-alive';
+          mutableHeaders['Content-Type'] = 'application/json';
+          if (method === 'GET') {
+            mutableHeaders['Accept-Encoding'] = 'gzip';
+          }
+          headers = mutableHeaders;
         }
-        headers = mutableHeaders;
-      }
 
-      return clobAxios({
-        method,
-        url: endpoint,
-        headers,
-        data,
-        params,
-        timeout: timeoutMs,
-        proxy: false,
-        ...(agent ? { httpAgent: agent, httpsAgent: agent } : {})
-      });
-    };
+        return clobAxios({
+          method,
+          url: endpoint,
+          headers,
+          data,
+          params,
+          timeout: timeoutMs,
+          proxy: false,
+          ...(agent ? { httpAgent: agent, httpsAgent: agent } : {})
+        });
+      };
 
-    clobHttpHelpers.request.__proxyPatched = true;
-    return true;
-  } catch {
-    return false;
+      clobHttpHelpers.request.__proxyPatched = true;
+      return true;
+    } catch {}
   }
+
+  return false;
 }
 
 function normalizeFetchHeaders(inputHeaders, initHeaders) {

@@ -2,11 +2,18 @@
 export const POLYGON_CHAIN_ID = 137;
 
 // Contract addresses (Polygon Mainnet)
-export const USDC_ADDRESS = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174';
+// NOTE: `USDC_ADDRESS` is retained for backward compatibility in the codebase,
+// but on V2 it is the pUSD collateral token address.
+export const PUSD_ADDRESS = '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB';
+export const USDC_ADDRESS = PUSD_ADDRESS;
+export const USDC_NATIVE_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+export const USDCE_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
 export const CTF_ADDRESS = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
-export const CTF_EXCHANGE_ADDRESS = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
-export const NEG_RISK_CTF_EXCHANGE = '0xC5d563A36AE78145C45a50134d48A1215220f80a';
+export const CTF_EXCHANGE_ADDRESS = '0xE111180000d2663C0091e4f400237545B87B996B';
+export const NEG_RISK_CTF_EXCHANGE = '0xe2222d279d744050d28e00520010520000310F59';
 export const NEG_RISK_ADAPTER = '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296';
+export const NEG_RISK_WRAPPED_COLLATERAL_ADDRESS = '0x3A3BD7bb9528E159577F7C2e685CC81A765002E2';
+export const COLLATERAL_ONRAMP_ADDRESS = '0x93070a847efEf7F70739046A929D47a521F5B8ee';
 
 // API endpoints
 export const GAMMA_API_URL = 'https://gamma-api.polymarket.com';
@@ -35,6 +42,11 @@ export const ERC20_ABI = [
   'function balanceOf(address account) external view returns (uint256)',
   'function decimals() external view returns (uint8)',
   'function transfer(address to, uint256 amount) external returns (bool)'
+];
+
+export const COLLATERAL_ONRAMP_ABI = [
+  'function wrap(address _asset, address _to, uint256 _amount) external',
+  'function COLLATERAL_TOKEN() external view returns (address)'
 ];
 
 // Constants

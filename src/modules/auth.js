@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from 'crypto';
-import { CLOB_API_URL, POLYGON_CHAIN_ID } from './constants.js';
+import { CLOB_API_URL } from './constants.js';
 import { createContext, safeLogInfo, safeLogWarn } from './logger.js';
 
 // Lazy import for node-machine-id (CommonJS compatibility)
@@ -32,20 +32,18 @@ export async function generatePrivateKey() {
 // SDK is loaded lazily via dynamic import to avoid runtime errors in Phase 1
 export async function createL2Credentials(privateKey) {
   // Dynamic import to avoid top-level SDK dependency
-  const { ClobClient } = await import('@polymarket/clob-client');
+  const { ClobClient, Chain } = await import('@polymarket/clob-client-v2');
   
   // Create a temporary wallet for L2 credential creation
   const signer = new ethers.Wallet(privateKey);
   
   // Initialize ClobClient with minimal config to access createApiKey/deriveApiKey
-  const client = new ClobClient(
-    CLOB_API_URL,
-    POLYGON_CHAIN_ID,
+  const client = new ClobClient({
+    host: CLOB_API_URL,
+    chain: Chain.POLYGON,
     signer,
-    undefined, // No creds yet
-    0, // signature_type: EOA
-    signer.address // funder: same as signer
-  );
+    funderAddress: signer.address
+  });
   
   // Try to create or derive API key
   // SDK returns { key, secret, passphrase } (not apiKey)

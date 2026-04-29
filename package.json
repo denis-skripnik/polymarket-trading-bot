@@ -21,7 +21,7 @@
     "pm2:logs": "pm2 logs polymarket-trading-bot --lines 200"
   },
   "dependencies": {
-    "@polymarket/clob-client": "^5.2.4",
+    "@polymarket/clob-client-v2": "^1.0.2",
     "axios": "^1.7.0",
     "better-sqlite3": "^11.0.0",
     "dotenv": "^16.4.0",

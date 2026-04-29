@@ -84,7 +84,7 @@ function buildMinSellThresholdMessage(totalSharesBase, minSharesBase, minNotiona
   const minNotionalLabel = formatUSDCFromBase(minNotionalUsdcBase);
   return (
     `Position is too small for percentage sell. ` +
-    `Balance: ${totalLabel} SHARES, minimum required: ${minSharesLabel} SHARES and ${minNotionalLabel} USDC notional.`
+    `Balance: ${totalLabel} SHARES, minimum required: ${minSharesLabel} SHARES and ${minNotionalLabel} pUSD notional.`
   );
 }
 
@@ -655,7 +655,7 @@ export function createTradeMarketFeature(deps) {
           t('error_order_failed', {
             message:
               `Selected percentage is too small. ` +
-              `Estimated notional must be at least ${formatUSDCFromBase(MIN_MARKET_SELL_NOTIONAL_USDC_BASE)} USDC.`
+              `Estimated notional must be at least ${formatUSDCFromBase(MIN_MARKET_SELL_NOTIONAL_USDC_BASE)} pUSD.`
           }),
           {
             reply_markup: buildSellPercentKeyboard('sellpct', t, enabledPercents)
