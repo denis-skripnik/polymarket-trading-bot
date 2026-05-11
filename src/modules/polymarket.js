@@ -2009,7 +2009,14 @@ async function ensureClobCollateralReady(amountUSDCBase) {
 
   const { balance, allowance, allowances, usdceBalance } = await getCollateralStatus();
   const balanceBig = safeToBigInt(balance);
-  const allowanceBig = safeToBigInt(allowance ?? allowances.ctfExchange);
+  const allowanceCandidates = [
+    safeToBigInt(allowances?.ctfExchange),
+    safeToBigInt(allowances?.negRiskExchange),
+    safeToBigInt(allowance)
+  ].filter((value) => value !== null);
+  const allowanceBig = allowanceCandidates.length
+    ? allowanceCandidates.reduce((max, value) => (value > max ? value : max), allowanceCandidates[0])
+    : null;
   const usdceBalanceBig = safeToBigInt(usdceBalance) ?? 0n;
 
   if (balanceBig === null || allowanceBig === null) {
